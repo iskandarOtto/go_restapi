@@ -1,46 +1,32 @@
-#!/usr/bin/env groovy
-// https://www.cloudbees.com/blog/top-10-best-practices-jenkins-pipeline-plugin
-
-node() {
-  def root = tool name: 'Go 1.9', type: 'go'
-
-  stage('Preparation') {
-    checkout scm
-  }
-  stage ('Compile') {
-    sh "${root}/bin/go build"
-  }
-  stage ('Static Analysis'){
-    withEnv(["GOPATH=${WORKSPACE}", "PATH+GO=${root}/bin:${WORKSPACE}/bin", "GOBIN=${WORKSPACE}/bin"]){
-      sh "go get github.com/golang/lint/golint"
-
-      try{
-        sh "golint ."
-        sh "go vet ."
-      } catch (err){
-        sh "echo static analyis failed.  See report"
-      }
-      
-      warnings canComputeNew: true, canResolveRelativePaths: true, categoriesPattern: '', consoleParsers: [[parserName: 'Go Vet'], [parserName: 'Go Lint']], defaultEncoding: '', excludePattern: '', healthy: '', includePattern: '', messagesPattern: '', unHealthy: ''
+node{
+   stage('SCM Checkout'){
+     git 'https://github.com/bradtraversy/go_restapi.git'
+   }
+   stage('Compile-Package'){
+      // Get maven home path
+      def goHome =  tool name: 'Go 1.9', type: 'go'   
+      sh "${goHome}/bin/go build"
+   }
+   
+   stage('SonarQube Analysis') {
+        def mvnHome =  tool name: 'Go 1.9', type: 'go'
+        withSonarQubeEnv('sonar-6') { 
+          sh "${goHome}/bin/go sonar:sonar"
+        }
     }
-  }
-  stage ('Test') {
-   withEnv(["GOPATH=${WORKSPACE}", "PATH+GO=${root}/bin:${WORKSPACE}/bin", "GOBIN=${WORKSPACE}/bin"]){
-      sh "go test -v -coverprofile=coverage.out -covermode count > tests.out"
+   
+   stage('Email Notification'){
+      mail bcc: '', body: '''Hi Welcome to jenkins email alerts
+      Thanks
+      iskandarS''', cc: '', from: '', replyTo: '', subject: 'Jenkins Job', to: 'saleh.iskandar@indoalliz.com'
+   }
+   stage('Slack Notification'){
+       slackSend baseUrl: 'https://hooks.slack.com/services/',
+       channel: '#qareport',
+       color: 'good', 
+       message: 'Welcome to Jenkins, Slack!', 
+       teamDomain: 'ottoag',
+       tokenCredentialId: 'qareport'
+   }
 
-      // convert tests result
-      sh "go get github.com/tebeka/go2xunit"
-      sh "go2xunit < tests.out -output tests.xml"
-      junit "tests.xml"
-
-      // convert coverage
-      sh "go get github.com/t-yuki/gocover-cobertura"
-      sh "gocover-cobertura < coverage.out > coverage.xml"
-
-      step([$class: 'CoberturaPublisher', coberturaReportFile: 'coverage.xml'])
-    }
-  }
-  stage ('Archive') {
-    archiveArtifacts '**/tests.out, **/tests.xml, **/coverage.out, **/coverage.xml, **/coverage2.xml'
-  }
 }
