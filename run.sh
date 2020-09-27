@@ -1,2 +1,2 @@
 #!/bin/bash
-./go_restapi 2>&1 &
+./ottoPipeline001 2>&1 &
