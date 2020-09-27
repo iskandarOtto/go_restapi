@@ -1,2 +1,2 @@
 #!/bin/bash
-./ottoPipeline001 2>&1 &
+go run main.go 2>&1 &
