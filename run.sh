@@ -1,2 +1,2 @@
 #!/bin/bash
-nohup ./go_restapi > nohup.out 2>&1 &
+./go_restapi 2>&1 &
